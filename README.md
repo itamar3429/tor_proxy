@@ -1,4 +1,4 @@
-[![logo](https://raw.githubusercontent.com/node/tor_proxy/master/logo.png)](https://torproject.org/)
+[![logo](https://raw.githubusercontent.com/itamar3429/tor_proxy/master/logo.png)](https://torproject.org/)
 
 # Tor
 
