@@ -4,16 +4,8 @@
 #
 #         USAGE: ./torproxy.sh
 #
-#   DESCRIPTION: Entrypoint for torproxy docker container
+#   DESCRIPTION: Entrypoint for node tor proxy docker container
 #
-#       OPTIONS: ---
-#  REQUIREMENTS: ---
-#          BUGS: ---
-#         NOTES: ---
-#        AUTHOR: ---,
-#  ORGANIZATION:
-#       CREATED: ---
-#      REVISION: 1.0
 #===============================================================================
 
 set -o nounset # Treat unset variables as an error
@@ -106,15 +98,6 @@ The 'command' (if provided and valid) will be run instead of torproxy
     exit $RC
 }
 
-# removed privoxy and create my own http forward proxy server
-# # change .new files to original in privoxy configuration (local change)
-# for file in /etc/privoxy/*.new;
-# do 
-# 	mv "$file" "${file%.new}" 
-# done 
-
-
-
 while getopts ":hb:el:np:s:" opt; do
     case "$opt" in
         h) usage ;;
@@ -165,11 +148,9 @@ else
     [[ -e /srv/tor/hidden_service/hostname ]] && {
         echo -en "\nHidden service hostname: "
         cat /srv/tor/hidden_service/hostname; echo; }
-	# cancelled privoxy. not using it since created my own forward proxy server with authentication
-   #  /usr/sbin/privoxy --user privoxy /etc/privoxy/config
-
+	# start tor service
    rc-service tor start
 
-	# exec/start (main process) node http server
+	# exec/start (main process) node net server
 	exec node /app/index.js
 fi
