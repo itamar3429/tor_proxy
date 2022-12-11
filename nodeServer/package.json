@@ -1,0 +1,21 @@
+{
+  "name": "microservice",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "http-proxy-agent": "^5.0.0",
+    "http-proxy-middleware": "^2.0.6",
+    "net": "^1.0.2",
+    "proxysocket": "^1.2.0",
+    "socks": "^2.7.1",
+    "socks-proxy-agent": "^7.0.0"
+  }
+}
