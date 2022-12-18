@@ -1,12 +1,8 @@
 const net = require("net");
 const createSocket = require("../utils/CreateSocket");
+const { authUser } = require("./auth");
+const { users } = require("./users");
 // users array. need to switch to db
-const users = [
-	{
-		username: "username",
-		password: "1234",
-	},
-];
 
 // tor constants
 const torProxyHost = "127.0.0.1";
@@ -24,12 +20,14 @@ const torProxyConfig = {
 
 // check if user authenticated return true else the socket will return 407, proxy auth required
 const authMiddleware = async (socket, username, password) => {
-	if (
-		users.find(
-			(user) => user.password == password && user.username == username
-		)
-	)
-		return true;
+	// if no auth is required return true to allow stream
+	if (NO_AUTH) return true;
+
+	// authenticate user through authentication protocols
+	const authenticated = await authUser(username, password);
+	if (authenticated) return true;
+
+	// user not allowed, end connection
 	socket.end(
 		"HTTP/1.1 407 Proxy Authentication Required\r\n" +
 			'Proxy-Authenticate: Basic  realm="Access to the proxy server"\r\n' +
@@ -66,12 +64,7 @@ const initProxy = (server) => {
 						.split(":");
 
 					if (
-						NO_AUTH ||
-						(await authMiddleware(
-							clientToProxySocket,
-							username,
-							password
-						))
+						await authMiddleware(clientToProxySocket, username, password)
 					) {
 						let isTLSConnection =
 							data.toString().indexOf("CONNECT") !== -1;

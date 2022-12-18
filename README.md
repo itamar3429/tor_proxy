@@ -85,6 +85,73 @@ the project also includes a web api (port: 5000) that can control the tor servic
 
        set `PROXY_PORT=<PORT>` env to set the port of the api
 
+-  authentication:
+
+   for authentication there is a default user allowed
+   username:secret.admin
+   password:1.admin@pass
+
+   there are a few ways to implement authentication:
+
+   -  to set user set the following env vars:
+
+      -  PROXY_ADMIN_USER=`<YOUR OWN USERNAME>`
+      -  PROXY_ADMIN_PASS=`<YOUR OWN PASS>`
+
+      this will allow only one username and password to use the proxy
+
+   -  you can also specify an external authenticator<br>
+      in order to do so you need to provide the following env vars
+
+      -  EXTERNAL_AUTH="TRUE"
+      -  USERS_AUTH_URL= the endpoint thee proxy will go to in order to verify if a user is allowed in
+      -  USER_AUTH_CREDENTIALS (optional) = a credentials string that will be sent with the auth request body if specified
+
+      if any of those is missing the proxy will use its default authentication mechanism.
+
+      the endpoint specified needs to include protocol://hostname:port/endpoint
+      <br>
+      it needs to support post method
+
+      will receive the following in the request body:
+
+      ```json
+      {
+      	"username": "string",
+      	"password": "string",
+      	"credentials": "string"
+      }
+      ```
+
+      the endpoint should return the following format:
+      <br>
+      success true if user allowed
+
+      ```json
+      	{
+      		"success":true | false
+      	}
+      ```
+
+      if endpoint doesn't exists or the request generates an error, the user will not be authenticated
+
+   -  note:
+
+      with proxy authentication, the proxy supports basic authentication method with the `Proxy-Authorization` header
+
+      <br>
+
+      with proxy controller api, the same authentication method as the proxy, but it'll expect the credentials in the following method:
+
+      set the following header:<br>
+      see [WWW-Authenticate](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/WWW-Authenticate)
+      <br>
+      Authorization: Basic YWxhZGRpbjpvcGVuc2VzYW1l => (base64 username:password)
+      <br>
+      if no authentication given,
+      the api will return status of 401 Unauthorized
+      and this header: `WWW-Authenticate: Basic realm=please login your credentials`
+
 ---
 
 ## Complex configuration
