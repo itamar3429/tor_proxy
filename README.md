@@ -128,9 +128,9 @@ there are a few ways to implement authentication:
    success true if user allowed
 
    ```json
-   	{
-   		"success":true | false
-   	}
+   {
+   	"success":true | false
+   }
    ```
 
    if endpoint doesn't exists or the request generates an error, the user will not be allowed
