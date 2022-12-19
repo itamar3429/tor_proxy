@@ -6,6 +6,7 @@ const {
 	restartTor,
 	startTor,
 	checkTorOk,
+	torStatus,
 } = require("../utils/torFunctions");
 const { authUser } = require("./auth");
 
@@ -47,8 +48,8 @@ const initApi = (app) => {
 
 	app.get("/start", async (req, res) => {
 		try {
-			const result = (await startTor()).toLowerCase();
-			if (result.includes("started"))
+			const result = startTor();
+			if (result && result == "active")
 				res.json({ success: true, message: "tor started" });
 			else throw "tor didn't start";
 		} catch (error) {
@@ -58,8 +59,12 @@ const initApi = (app) => {
 
 	app.get("/restart", async (req, res) => {
 		try {
-			const result = (await restartTor()).toLowerCase();
-			if (result.includes("started") && result.includes("starting"))
+			const result = await restartTor();
+			if (
+				result &&
+				result == "active"
+				// && result.includes("starting")
+			)
 				res.json({ success: true, message: "tor restarted" });
 			else throw "tor didn't restart";
 		} catch (error) {
@@ -68,8 +73,8 @@ const initApi = (app) => {
 	});
 	app.get("/reload", async (req, res) => {
 		try {
-			const result = (await reloadTor()).toLowerCase();
-			if (result?.includes?.("started") && result?.includes?.("reloading"))
+			const result = await reloadTor();
+			if (result && result == "active")
 				res.json({ success: true, message: "tor reloaded" });
 			else throw "tor didn't reload";
 		} catch (error) {
@@ -79,10 +84,18 @@ const initApi = (app) => {
 
 	app.get("/stop", async (req, res) => {
 		try {
-			const result = (await stopTor()).toLowerCase();
-			if (result.includes("stopped"))
+			const result = stopTor();
+			if (result == "stopped")
 				res.json({ success: true, message: "tor stopped" });
 			else throw "tor didn't stop";
+		} catch (error) {
+			res.json({ success: false, message: error?.message || error });
+		}
+	});
+	app.get("/status", async (req, res) => {
+		try {
+			const result = torStatus();
+			res.json({ status: result });
 		} catch (error) {
 			res.json({ success: false, message: error?.message || error });
 		}
@@ -102,8 +115,8 @@ const initApi = (app) => {
 	app.get("/set-country/:country", async (req, res) => {
 		try {
 			const country = req.params.country;
-			const result = (await setTorCountry(country)).toLowerCase();
-			if (result.includes("started"))
+			const result = await setTorCountry(country);
+			if (result === "active")
 				res.json({ success: true, message: "country set to " + country });
 			else {
 				throw "cant set to given country, tor'll default to US as country";

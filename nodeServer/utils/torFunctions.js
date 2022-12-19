@@ -1,11 +1,15 @@
-const { exec } = require("child_process");
+const { exec, spawn } = require("child_process");
+const delay = require("./delay");
+const TorProcessManager = require("./TorProcessManager");
+
+const torProcess = new TorProcessManager();
 
 /**
  *
  * @param {string} country
  */
-function setTorCountry(country) {
-	return new Promise((res, rej) => {
+async function setTorCountry(country) {
+	const res = await new Promise((res, rej) => {
 		exec(
 			`file=/etc/tor/torrc && sed -i '/^StrictNodes/d; /^ExitNodes/d' $file && echo "StrictNodes 1" >>$file && echo "ExitNodes {${country}}" >>$file
 		 `,
@@ -16,63 +20,29 @@ function setTorCountry(country) {
 				res("no result");
 			}
 		);
-	}).then(async (res) => res + (await restartTor()));
+	});
+	return await torProcess.restartTor();
 }
 
-function restartTor() {
-	return new Promise((res, rej) => {
-		exec(
-			`rc-service tor restart && rc-service tor status`,
-			(err, result, stderr) => {
-				if (result) res(result);
-				else if (stderr) rej(stderr);
-				else if (err) rej(err);
-				res("no result");
-			}
-		);
-	});
+async function restartTor() {
+	const res = await torProcess.restartTor();
+	return res;
 }
 
 function stopTor() {
-	return new Promise((res, rej) => {
-		exec(
-			`rc-service tor stop && rc-service tor status`,
-			(err, result, stderr) => {
-				if (result) res(result);
-				else if (stderr) rej(stderr);
-				else if (err) rej(err);
-				res("no result");
-			}
-		);
-	});
+	return torProcess.stopTor();
 }
 
 function startTor() {
-	return new Promise((res, rej) => {
-		exec(
-			`rc-service tor start && rc-service tor status`,
-			(err, result, stderr) => {
-				if (result) res(result);
-				else if (stderr) rej(stderr);
-				else if (err) rej(err);
-				res("no result");
-			}
-		);
-	});
+	return torProcess.startTor();
 }
 
 function reloadTor() {
-	return new Promise((res, rej) => {
-		exec(
-			`rc-service tor reload && rc-service tor status`,
-			(err, result, stderr) => {
-				if (result) res(result);
-				else if (stderr) rej(stderr);
-				else if (err) rej(err);
-				res("no result");
-			}
-		);
-	});
+	return torProcess.restartTor();
+}
+
+function torStatus() {
+	return torProcess.status();
 }
 
 function checkTorOk(torProxyStr) {
@@ -101,4 +71,5 @@ module.exports = {
 	startTor,
 	setTorCountry,
 	checkTorOk,
+	torStatus,
 };

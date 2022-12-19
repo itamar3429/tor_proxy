@@ -148,8 +148,6 @@ else
     [[ -e /srv/tor/hidden_service/hostname ]] && {
         echo -en "\nHidden service hostname: "
         cat /srv/tor/hidden_service/hostname; echo; }
-	# start tor service
-   rc-service tor start
 
 	# exec/start (main process) node net server
 	exec node /app/index.js

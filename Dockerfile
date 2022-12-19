@@ -2,12 +2,12 @@ FROM node:lts-alpine
 WORKDIR /app
 
 # service manager rc-service installaion
-RUN apk update \
-	&& apk add --no-cache openrc \
-	&& mkdir -p /run/openrc \
-	&& mkdir -p /run/tor \
-	&& touch /run/openrc/softlevel \
-	&& rc-status -a
+# RUN apk update \
+# 	&& apk add --no-cache openrc \
+# 	&& mkdir -p /run/openrc \
+# 	&& mkdir -p /run/tor \
+# 	&& touch /run/openrc/softlevel \
+# 	&& rc-status -a
 
 
 # Install tor and privoxy
@@ -44,7 +44,7 @@ RUN cd /app \
 	&& npm ci
 
 #      tor  tor  api  proxy_server
-EXPOSE 9050 9051 5000 8080
+EXPOSE 5000 8080
 
 HEALTHCHECK --interval=60s --timeout=15s --start-period=20s \
             CMD curl -sx socks5://localhost:9050  https://check.torproject.org/ | \

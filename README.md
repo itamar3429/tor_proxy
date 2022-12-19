@@ -87,8 +87,8 @@ the project also includes a web api (port: 5000) that can control the tor servic
 
 ## authentication:
 
-for authentication there is a default user allowed
-username:secret.admin
+for authentication there is a default user allowed<br>
+username:secret.admin<br>
 password:1.admin@pass
 
 there are a few ways to implement authentication:
