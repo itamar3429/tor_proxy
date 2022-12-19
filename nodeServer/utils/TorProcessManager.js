@@ -1,3 +1,4 @@
+const { spawn } = require("child_process");
 class TorProcessManager {
 	torProcess = spawn("tor");
 
