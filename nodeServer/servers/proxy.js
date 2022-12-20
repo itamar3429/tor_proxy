@@ -82,16 +82,22 @@ const proxyProcess = async (clientToProxySocket, data) => {
 
 /**
  *
- * @param {net.Socket} clientToProxySocket
+ * @param {net.Socket} socket
  * @param {Buffer} data
  * @param {express.Application} app
  *
  * route the socket through the express application and send back the response
  */
-const apiProcess = async (clientToProxySocket, data, app) => {
+const apiProcess = async (socket, data, app) => {
+	// socket.write(`HTTP/1.1 200 OK\n\r\n\rsome data in body`);
+	// socket.end(() => {
+	// 	console.log("connection ended");
+	// });
+	// return;
+
 	const parsed = parseRequestData(data.toString().trim());
 
-	const req = new http.IncomingMessage(clientToProxySocket);
+	const req = new http.IncomingMessage(socket);
 
 	req.method = parsed.method;
 	req.url = parsed.url;
@@ -109,18 +115,21 @@ const apiProcess = async (clientToProxySocket, data, app) => {
 			if (key == "content-length") value = +value + 1;
 			response += `${key}: ${value}\n\r`;
 		}
-		clientToProxySocket.write(response);
+		socket.write(response);
 	};
-	res.assignSocket(clientToProxySocket);
+	res.assignSocket(socket);
 	res.end = (...params) => {
 		res.writeHead(
 			res.statusCode,
 			res.statusMessage || "OK",
 			res.getHeaders()
 		);
-		clientToProxySocket.write("\n\r" + params[0]);
 
-		clientToProxySocket.end();
+		socket.write("\n\r" + params[0]);
+		console.log("sending data to client");
+		socket.end(() => {
+			console.log("response sent");
+		});
 	};
 
 	app(req, res);
@@ -133,24 +142,29 @@ const apiProcess = async (clientToProxySocket, data, app) => {
  */
 const initServer = (server, app) => {
 	server.on("connection", async (clientToProxySocket) => {
+		console.log("connected waiting for data stream");
 		try {
 			// when received data (request headers)
 			clientToProxySocket.once("data", async (data) => {
+				console.log("received data stream (headers)");
 				const dataStr = data.toString();
 				if (
 					// if includes connect, the request is a proxy request
 					dataStr.split("/n").some((header) => header.match(/^CONNECT.*/))
 				) {
-					// console.log("its a proxy request");
+					console.log("routing to proxy connection");
 					proxyProcess(clientToProxySocket, data);
 				} else {
-					// console.log("its an http request to api");
+					console.log("routing to http api (express app)");
 					apiProcess(clientToProxySocket, data, app);
 				}
 			});
 		} catch (err) {
 			console.log(err);
 		}
+		clientToProxySocket.on("close", () => {
+			console.log("socket disconnected");
+		});
 	});
 
 	server.on("error", (err) => {
