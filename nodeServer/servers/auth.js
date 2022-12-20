@@ -1,9 +1,11 @@
 const { users } = require("./users");
 const axios = require("axios");
+const net = require("net");
 
 const USERS_AUTH_URL = process.env.USERS_AUTH_URL;
 const EXTERNAL_AUTH = USERS_AUTH_URL && process.env.EXTERNAL_AUTH == "TRUE";
 const AUTH_CREDENTIALS = process.env.USER_AUTH_CREDENTIALS;
+const NO_AUTH = process.env.NO_AUTH == "TRUE";
 
 const ADMIN_USER = process.env.PROXY_ADMIN_USER;
 const ADMIN_PASS = process.env.PROXY_ADMIN_PASS;
@@ -49,4 +51,31 @@ async function authUserExternal(username, password) {
 	}
 }
 
-module.exports = { authUser };
+//
+/**
+ *
+ * @param {net.Socket} socket
+ * @param {string} username
+ * @param {string} password
+ *
+ * check if user authenticated return true else the socket will return 407, proxy auth required
+ */
+const authMiddleware = async (socket, username, password) => {
+	// if no auth is required return true to allow stream
+	if (NO_AUTH) return true;
+
+	// authenticate user through authentication protocols
+	const authenticated = await authUser(username, password);
+	if (authenticated) return true;
+
+	// user not allowed, end connection
+	socket.end(
+		"HTTP/1.1 407 Proxy Authentication Required\r\n" +
+			'Proxy-Authenticate: Basic  realm="Access to the proxy server"\r\n' +
+			`Date: ${new Date()}\r\n` +
+			"\r\n",
+		() => {}
+	);
+	return false;
+};
+module.exports = { authMiddleware, authUser };

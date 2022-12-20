@@ -44,7 +44,7 @@ RUN cd /app \
 	&& npm ci
 
 #      tor  tor  api  proxy_server
-EXPOSE 5000 8080
+EXPOSE 8080
 
 HEALTHCHECK --interval=60s --timeout=15s --start-period=20s \
             CMD curl -sx socks5://localhost:9050  https://check.torproject.org/ | \

@@ -9,46 +9,49 @@ const {
 	torStatus,
 } = require("../utils/torFunctions");
 const { authUser } = require("./auth");
+const { torProxyProtocol, torProxyHost, torProxyPort } = require("./proxy");
 
 const NO_AUTH = process.env.NO_AUTH == "TRUE";
+
+const TOR_PROXY_URL = `${torProxyProtocol}://${torProxyHost}:${torProxyPort}`;
+
+const apiAuthMiddleware = async (req, res, next) => {
+	// authorization middleware
+	if (NO_AUTH) return next();
+
+	if (!req.headers.authorization) {
+		res.set("WWW-Authenticate", "Basic realm=please login your credentials");
+		res.status(401).json({
+			success: false,
+			message: "required authentication",
+		});
+		return;
+	}
+	const AuthString = Buffer.from(
+		req.headers.authorization.split(" ")[1],
+		"base64"
+	).toString("ascii");
+	const [username, password] = AuthString.split(":");
+	if (await authUser(username, password)) {
+		return next();
+	}
+	res.status(401).json({
+		success: false,
+		message: "username and password not authorized",
+	});
+};
 
 /**
  *
  * @param {express.Application} app
  */
 const initApi = (app) => {
-	app.use(async (req, res, next) => {
-		// authorization middleware
-		if (NO_AUTH) return next();
-
-		if (!req.headers.authorization) {
-			res.set(
-				"WWW-Authenticate",
-				"Basic realm=please login your credentials"
-			);
-			res.status(401).json({
-				success: false,
-				message: "required authentication",
-			});
-			return;
-		}
-		const AuthString = Buffer.from(
-			req.headers.authorization.split(" ")[1],
-			"base64"
-		).toString("ascii");
-		const [username, password] = AuthString.split(":");
-		if (await authUser(username, password)) {
-			return next();
-		}
-		res.status(401).json({
-			success: false,
-			message: "username and password not authorized",
-		});
-	});
+	app.use(apiAuthMiddleware);
 
 	app.get("/start", async (req, res) => {
 		try {
 			const result = startTor();
+			console.log("express app /start");
 			if (result && result == "active")
 				res.json({ success: true, message: "tor started" });
 			else throw "tor didn't start";
@@ -103,7 +106,7 @@ const initApi = (app) => {
 
 	app.get("/check-ok", async (req, res) => {
 		try {
-			const result = (await checkTorOk()).toLowerCase();
+			const result = (await checkTorOk(TOR_PROXY_URL)).toLowerCase();
 			if (result.includes("proxy_ok"))
 				res.json({ success: true, message: "proxy ok" });
 			else throw "problem with proxy";
@@ -127,6 +130,13 @@ const initApi = (app) => {
 			} catch (error) {}
 			res.json({ success: false, message: error?.message || error });
 		}
+	});
+
+	app.get("*", async (req, res) => {
+		res.json({
+			success: false,
+			message: "cannot get " + req.url,
+		});
 	});
 };
 

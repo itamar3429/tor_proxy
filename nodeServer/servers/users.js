@@ -1,7 +1,7 @@
 const users = [
 	{
-		username: "secret.admin",
-		password: "1.admin@pass",
+		username: "admin",
+		password: "pass",
 	},
 ];
 

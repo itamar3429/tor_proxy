@@ -60,7 +60,7 @@ the project also includes a web api (port: 5000) that can control the tor servic
        -  /set-country/:country_code - to set the exit node country of tor to the given country_code,
        	if fails (country not valid), will return to the default value, US.
 
-       	set `API_PORT=<PORT>` env to set the port of the api
+       	set `PORT=<PORT>` env to set the port of the server - both api and server are on the same port now
 
 -  node proxy server:
 
@@ -83,13 +83,13 @@ the project also includes a web api (port: 5000) that can control the tor servic
 
        Check authMiddleware in proxy.js for more information.
 
-       set `PROXY_PORT=<PORT>` env to set the port of the api
+       set `PORT=<PORT>` env to set the port of the server
 
 ## authentication:
 
 for authentication there is a default user allowed<br>
-username:secret.admin<br>
-password:1.admin@pass
+username:admin<br>
+password:pass
 
 there are a few ways to implement authentication:
 
@@ -189,8 +189,7 @@ ENVIRONMENT VARIABLES
 -  `GROUPID` - Set the GID for the app user
 -  `USE_TOR` - If set to `FALSE`, tells node server to not use tor as a relay but connect to the target directly
 -  `NO_AUTH` - If set to `TRUE`, tells the proxy server to not use authentication (allow everyone)
--  `API_PORT` - If set, api port will be the given value, otherwise will default to 5000.
--  `PROXY_PORT` - If set, proxy port will be the given value, otherwise will default to 8080.
+-  `PORT` - If set, proxy and api port will be the given value, otherwise will default to 8080.
 
 Other environment variables beginning with `TOR_` will edit the configuration
 file accordingly:

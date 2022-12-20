@@ -1,5 +1,4 @@
-const { exec, spawn } = require("child_process");
-const delay = require("./delay");
+const { exec } = require("child_process");
 const TorProcessManager = require("./TorProcessManager");
 
 const torProcess = new TorProcessManager();
@@ -48,14 +47,19 @@ function torStatus() {
 function checkTorOk(torProxyStr) {
 	return new Promise((res, rej) => {
 		exec(
-			`if [[ "$(curl ifconfig.me)" != "$(curl -x ${torProxyStr} ifconfig.me)" ]] 
+			`
+			WITH_PROXY="$(curl -x ${torProxyStr} ifconfig.me)"
+			WITHOUT_PROXY="$(curl ifconfig.me)"
+			if [ $WITH_PROXY != $WITHOUT_PROXY ] 
 			then
-			echo proxy_ok
+				echo proxy_ok
 			else
-			echo proxy_not_ok
+				echo proxy_not_ok
 			fi
 			`,
 			(err, result, stderr) => {
+				console.log(result);
+				// console.log(stderr);
 				if (result) res(result);
 				else if (stderr) rej(stderr);
 				else if (err) rej(err);

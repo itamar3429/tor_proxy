@@ -1,7 +1,10 @@
 const net = require("net");
 const createSocket = require("../utils/CreateSocket");
-const { authUser } = require("./auth");
-const { users } = require("./users");
+const { authMiddleware } = require("./auth");
+const http = require("http");
+const express = require("express");
+const parseRequestData = require("../utils/parseRequestData");
+const parseRequestInfo = require("../utils/parseRequestInfo");
 // users array. need to switch to db
 
 // tor constants
@@ -10,126 +13,139 @@ const torProxyPort = 9050;
 const torProxyProtocol = "socks5";
 
 const USE_TOR = process.env.USE_TOR != "FALSE";
-const NO_AUTH = process.env.NO_AUTH == "TRUE";
 
 const torProxyConfig = {
 	host: torProxyHost,
 	port: torProxyPort,
 	protocol: torProxyProtocol,
 };
+/**
+ *
+ * @param {net.Socket} clientToProxySocket
+ * @param {Buffer} data
+ *
+ * route the request through the proxy server and pipe the return
+ */
+const proxyProcess = async (clientToProxySocket, data) => {
+	try {
+		const { password, serverAddress, serverPort, username, isTLSConnection } =
+			parseRequestInfo(data);
 
-// check if user authenticated return true else the socket will return 407, proxy auth required
-const authMiddleware = async (socket, username, password) => {
-	// if no auth is required return true to allow stream
-	if (NO_AUTH) return true;
+		if (await authMiddleware(clientToProxySocket, username, password)) {
+			try {
+				// Creating a connection from proxy to destination server
+				let proxyToServerSocket = await createSocket({
+					proxy: USE_TOR ? torProxyConfig : undefined,
+					serverHost: serverAddress,
+					serverPort,
+				});
 
-	// authenticate user through authentication protocols
-	const authenticated = await authUser(username, password);
-	if (authenticated) return true;
+				if (isTLSConnection) {
+					clientToProxySocket.write("HTTP/1.1 200 OK\r\n\r\n");
+				} else {
+					proxyToServerSocket.write(data);
+				}
 
-	// user not allowed, end connection
-	socket.end(
-		"HTTP/1.1 407 Proxy Authentication Required\r\n" +
-			'Proxy-Authenticate: Basic  realm="Access to the proxy server"\r\n' +
-			`Date: ${new Date()}\r\n` +
-			"\r\n",
-		() => {}
-	);
-	return false;
+				clientToProxySocket.pipe(proxyToServerSocket);
+				proxyToServerSocket.pipe(clientToProxySocket);
+
+				proxyToServerSocket?.on("error", (err) => {
+					console.log("Proxy to server error");
+					console.log(err);
+				});
+
+				clientToProxySocket?.on("error", (err) => {
+					console.log("Client to proxy error");
+					console.log(err);
+				});
+			} catch (error) {
+				console.log(error);
+			}
+		}
+	} catch (error) {
+		try {
+			console.log(error);
+			clientToProxySocket &&
+				clientToProxySocket.closed == false &&
+				clientToProxySocket?.end?.(
+					"HTTP/1.1 500 Internal Server Error\r\n" +
+						`Date: ${new Date()}\r\n` +
+						`data: unexpected server error trying to connect client to proxy\r\n` +
+						"\r\n"
+				);
+		} catch (error) {
+			console.log(error);
+			// console.log(error);
+		}
+	}
+};
+
+/**
+ *
+ * @param {net.Socket} clientToProxySocket
+ * @param {Buffer} data
+ * @param {express.Application} app
+ *
+ * route the socket through the express application and send back the response
+ */
+const apiProcess = async (clientToProxySocket, data, app) => {
+	const parsed = parseRequestData(data.toString().trim());
+
+	const req = new http.IncomingMessage(clientToProxySocket);
+
+	req.method = parsed.method;
+	req.url = parsed.url;
+	req.headers = parsed.headers;
+	req.rawHeaders = data.toString();
+	req.body = parsed.body;
+	req.on("close", () => console.log("closed"));
+	req.header = data.toString();
+
+	const res = new http.ServerResponse(req);
+	res.header = data.toString();
+	res.writeHead = (statusCode, statusMessage, headers) => {
+		let response = `HTTP/1.1 ${statusCode} ${statusMessage}\n\r`;
+		for (let [key, value] of Object.entries(headers || {})) {
+			if (key == "content-length") value = +value + 1;
+			response += `${key}: ${value}\n\r`;
+		}
+		clientToProxySocket.write(response);
+	};
+	res.assignSocket(clientToProxySocket);
+	res.end = (...params) => {
+		res.writeHead(
+			res.statusCode,
+			res.statusMessage || "OK",
+			res.getHeaders()
+		);
+		clientToProxySocket.write("\n\r" + params[0]);
+
+		clientToProxySocket.end();
+	};
+
+	app(req, res);
 };
 
 /**
  *
  * @param {net.Server} server
+ * @param {express.Application} app
  */
-const initProxy = (server) => {
+const initServer = (server, app) => {
 	server.on("connection", async (clientToProxySocket) => {
 		try {
+			// when received data (request headers)
 			clientToProxySocket.once("data", async (data) => {
-				try {
-					const credentialsBase64 =
-						data
-							.toString()
-							.split("Proxy-Authorization: ")[1]
-							?.split("\r\n")[0]
-							.trim()
-							.split(" ")[1]
-							.trim() || "";
-
-					const [username, password] = Buffer.from(
-						credentialsBase64,
-						"base64"
-					)
-						.toString("ascii")
-						.split(":");
-
-					if (
-						await authMiddleware(clientToProxySocket, username, password)
-					) {
-						let isTLSConnection =
-							data.toString().indexOf("CONNECT") !== -1;
-
-						let serverPort = 80;
-						let serverAddress;
-						if (isTLSConnection) {
-							serverPort = 443;
-							serverAddress = data
-								.toString()
-								.split("CONNECT")[1]
-								.split(" ")[1]
-								.split(":")[0];
-						} else {
-							serverAddress = data
-								.toString()
-								.split("Host: ")[1]
-								.split("\r\n")[0];
-						}
-
-						try {
-							// Creating a connection from proxy to destination server
-							let proxyToServerSocket = await createSocket({
-								proxy: USE_TOR ? torProxyConfig : undefined,
-								serverHost: serverAddress,
-								serverPort,
-							});
-
-							if (isTLSConnection) {
-								clientToProxySocket.write("HTTP/1.1 200 OK\r\n\r\n");
-							} else {
-								proxyToServerSocket.write(data);
-							}
-
-							clientToProxySocket.pipe(proxyToServerSocket);
-							proxyToServerSocket.pipe(clientToProxySocket);
-
-							proxyToServerSocket?.on("error", (err) => {
-								console.log("Proxy to server error");
-								console.log(err);
-							});
-
-							clientToProxySocket?.on("error", (err) => {
-								console.log("Client to proxy error");
-								console.log(err);
-							});
-						} catch (error) {
-							console.log(error);
-						}
-					}
-				} catch (error) {
-					try {
-						console.log(error);
-						clientToProxySocket &&
-							clientToProxySocket.closed == false &&
-							clientToProxySocket?.end?.(
-								"HTTP/1.1 500 Internal Server Error\r\n" +
-									`Date: ${new Date()}\r\n` +
-									`data: unexpected server error trying to connect client to proxy, try restarting tor service \r\n` +
-									"\r\n"
-							);
-					} catch (error) {
-						console.log(error);
-						// console.log(error);
-					}
+				const dataStr = data.toString();
+				if (
+					// if includes connect, the request is a proxy request
+					dataStr.split("/n").some((header) => header.match(/^CONNECT.*/))
+				) {
+					// console.log("its a proxy request");
+					proxyProcess(clientToProxySocket, data);
+				} else {
+					// console.log("its an http request to api");
+					apiProcess(clientToProxySocket, data, app);
 				}
 			});
 		} catch (err) {
@@ -147,4 +163,10 @@ const initProxy = (server) => {
 	});
 };
 
-module.exports = initProxy;
+module.exports = {
+	initServer,
+	torProxyHost,
+	torProxyPort,
+	torProxyProtocol,
+	torProxyConfig,
+};
